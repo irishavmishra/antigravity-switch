@@ -366,7 +366,7 @@ async fn start_oauth_flow(app_handle: tauri::AppHandle) -> Result<AccountRespons
     // Start server and wait for callback (this blocks until user authorizes)
     let auth_code = match oauth::start_oauth_server().await {
         Ok(code) => code,
-        Err(e) => {
+        Err(_e) => {
             return Ok(AccountResponse {
                 success: false,
                 account: None,
