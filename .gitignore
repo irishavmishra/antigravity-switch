@@ -1,0 +1,9 @@
+node_modules
+dist
+release
+.gemini
+brain
+.env
+.DS_Store
+Thumbs.db
+*.log
