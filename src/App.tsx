@@ -165,7 +165,16 @@ function AppContent() {
         showToast('OAuth failed or was cancelled', 'error');
       }
     } catch (error) {
-      showToast('Failed to complete OAuth flow', 'error');
+      // The backend returns the error message as a string
+      const errorMessage = typeof error === 'string' ? error : 'Failed to complete OAuth flow';
+      
+      // Check for specific known errors to provide better formatting
+      if (errorMessage.includes("GOOGLE_CLIENT_ID not set")) {
+        showToast('Configuration Error: Missing Google OAuth Credentials. See console for details.', 'error');
+      } else {
+        showToast(errorMessage, 'error');
+      }
+      
       console.error('OAuth error:', error);
     }
   };
