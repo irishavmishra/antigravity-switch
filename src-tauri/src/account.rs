@@ -217,9 +217,26 @@ impl AccountManager {
         let mut accounts = self.load_accounts()?;
         let mut added = 0;
         let mut updated = 0;
+        let mut skipped = 0;
         
         for mut imported_account in imported {
-            if imported_account.email.is_empty() || imported_account.refresh_token.is_empty() {
+            // Validate required fields
+            if imported_account.email.is_empty() {
+                eprintln!("Skipping account with empty email");
+                skipped += 1;
+                continue;
+            }
+            
+            if imported_account.refresh_token.is_empty() {
+                eprintln!("Skipping account {} with empty refresh_token", imported_account.email);
+                skipped += 1;
+                continue;
+            }
+            
+            // Validate email format (basic check)
+            if !imported_account.email.contains('@') {
+                eprintln!("Skipping account with invalid email format: {}", imported_account.email);
+                skipped += 1;
                 continue;
             }
             
@@ -228,8 +245,14 @@ impl AccountManager {
                 imported_account.id = Uuid::new_v4().to_string();
             }
             
+            // Set default name if empty
+            if imported_account.name.is_empty() {
+                imported_account.name = Some(imported_account.email.split('@').next().unwrap_or("Unknown").to_string());
+            }
+            
             if let Some(existing) = accounts.iter_mut().find(|a| a.email == imported_account.email) {
-                // Update existing
+                // Update existing - preserve added_at timestamp
+                imported_account.added_at = existing.added_at;
                 *existing = imported_account;
                 updated += 1;
             } else {
@@ -237,6 +260,13 @@ impl AccountManager {
                 accounts.push(imported_account);
                 added += 1;
             }
+        }
+        
+        if added == 0 && updated == 0 && skipped > 0 {
+            anyhow::bail!(
+                "No valid accounts found to import. {} accounts were skipped due to missing email or refresh_token.",
+                skipped
+            );
         }
         
         self.save_accounts(&accounts)?;

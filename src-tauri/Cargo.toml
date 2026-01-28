@@ -23,6 +23,7 @@ uuid = { version = "1.6", features = ["v4"] }
 anyhow = "1.0"
 thiserror = "1.0"
 open = "5.0"
+dotenv = "0.15"
 
 [features]
 default = ["custom-protocol"]

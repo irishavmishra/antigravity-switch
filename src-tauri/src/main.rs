@@ -279,13 +279,52 @@ async fn export_accounts(state: State<'_, AppState>) -> Result<String, ApiError>
     Ok(json)
 }
 
-/// Import accounts from JSON
+/// Import accounts from JSON with better error handling
 #[tauri::command]
 async fn import_accounts(
     json_data: String,
     state: State<'_, AppState>,
 ) -> Result<ImportResponse, ApiError> {
-    let imported: Vec<Account> = serde_json::from_str(&json_data)?;
+    // Try to parse as array first
+    let imported: Vec<Account> = match serde_json::from_str(&json_data) {
+        Ok(accounts) => accounts,
+        Err(e) => {
+            // Check if it's a single object wrapped in an object with an "accounts" key
+            let wrapper: serde_json::Value = match serde_json::from_str(&json_data) {
+                Ok(v) => v,
+                Err(_) => return Err(ApiError::from(e)),
+            };
+            
+            // Try to extract accounts array from wrapper object
+            if let Some(accounts_array) = wrapper.get("accounts").or_else(|| wrapper.get("data")) {
+                match serde_json::from_value(accounts_array.clone()) {
+                    Ok(accounts) => accounts,
+                    Err(e2) => {
+                        return Err(ApiError {
+                            error: format!(
+                                "Failed to parse JSON. Expected an array of accounts or an object with 'accounts' key. Error: {}",
+                                e2
+                            ),
+                        });
+                    }
+                }
+            } else {
+                return Err(ApiError {
+                    error: format!(
+                        "Invalid JSON format. Expected an array of accounts or an object with 'accounts' key. Error: {}",
+                        e
+                    ),
+                });
+            }
+        }
+    };
+    
+    if imported.is_empty() {
+        return Err(ApiError {
+            error: "No accounts found in the JSON file".to_string(),
+        });
+    }
+    
     let mut manager = state.account_manager.lock().unwrap();
     
     let (added, updated) = manager.import_accounts(imported)?;
@@ -336,7 +375,7 @@ async fn handle_oauth_callback(
     };
     
     // Get user info
-    let user_info = match oauth::get_user_info(&tokens.access_token).await {
+    let user_info = match oauth::fetch_user_info(&tokens.access_token).await {
         Ok(u) => u,
         Err(_e) => {
             return Ok(AccountResponse {
@@ -381,6 +420,9 @@ async fn refresh_quota(
 // ==================== MAIN ====================
 
 fn main() {
+    // Load environment variables from .env file
+    dotenv::dotenv().ok();
+    
     // Initialize account manager
     let account_manager = match AccountManager::new() {
         Ok(am) => Mutex::new(am),
