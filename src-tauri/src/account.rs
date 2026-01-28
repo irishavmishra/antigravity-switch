@@ -245,8 +245,8 @@ impl AccountManager {
                 imported_account.id = Uuid::new_v4().to_string();
             }
             
-            // Set default name if empty
-            if imported_account.name.is_empty() {
+            // Set default name if None or empty
+            if imported_account.name.is_none() || imported_account.name.as_ref().map(|s| s.is_empty()).unwrap_or(true) {
                 imported_account.name = Some(imported_account.email.split('@').next().unwrap_or("Unknown").to_string());
             }
             
