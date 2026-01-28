@@ -114,7 +114,8 @@
         "center": true,
         "decorations": true,
         "transparent": false,
-        "theme": "Dark"
+        "theme": "Dark",
+        "windowIcon": "icons/icon.png"
       }
     ],
     "systemTray": {
