@@ -6,14 +6,10 @@
     windows_subsystem = "windows"
 )]
 
-use std::collections::HashMap;
-use std::fs;
-use std::path::PathBuf;
-use std::process::Command;
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
-use tauri::{Manager, State, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem};
+use tauri::{CustomMenuItem, Manager, State, SystemTray, SystemTrayEvent, SystemTrayMenu};
 
 mod account;
 mod db;
@@ -45,6 +41,14 @@ impl From<anyhow::Error> for ApiError {
 
 impl From<std::io::Error> for ApiError {
     fn from(err: std::io::Error) -> Self {
+        ApiError {
+            error: err.to_string(),
+        }
+    }
+}
+
+impl From<serde_json::Error> for ApiError {
+    fn from(err: serde_json::Error) -> Self {
         ApiError {
             error: err.to_string(),
         }
@@ -94,8 +98,11 @@ struct AccountWithQuota {
 /// Get all accounts with their quota information
 #[tauri::command]
 async fn get_accounts(state: State<'_, AppState>) -> Result<AccountsResponse, ApiError> {
-    let manager = state.account_manager.lock().unwrap();
-    let accounts = manager.load_accounts()?;
+    // Load accounts first, then release the lock before await
+    let accounts = {
+        let manager = state.account_manager.lock().unwrap();
+        manager.load_accounts()?
+    };
     
     let mut accounts_with_quota = Vec::new();
     
@@ -135,22 +142,24 @@ async fn add_account(
     name: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<AccountResponse, ApiError> {
-    let mut manager = state.account_manager.lock().unwrap();
-    
-    // Validate the token by trying to refresh it
-    match oauth::refresh_access_token(&refresh_token).await {
-        Ok(token_data) => {
-            let account = manager.add_account(email, refresh_token, name, Some(token_data))?;
-            Ok(AccountResponse {
-                success: true,
-                account: Some(account),
-            })
+    // Validate the token by trying to refresh it first (before acquiring lock)
+    let token_data = match oauth::refresh_access_token(&refresh_token).await {
+        Ok(token_data) => token_data,
+        Err(_) => {
+            return Ok(AccountResponse {
+                success: false,
+                account: None,
+            });
         }
-        Err(e) => Ok(AccountResponse {
-            success: false,
-            account: None,
-        }),
-    }
+    };
+    
+    let mut manager = state.account_manager.lock().unwrap();
+    let account = manager.add_account(email, refresh_token, name, Some(token_data))?;
+    
+    Ok(AccountResponse {
+        success: true,
+        account: Some(account),
+    })
 }
 
 /// Delete an account
@@ -166,35 +175,38 @@ async fn delete_account(account_id: String, state: State<'_, AppState>) -> Resul
 async fn switch_account(
     account_id: String,
     state: State<'_, AppState>,
-    app_handle: tauri::AppHandle,
+    _app_handle: tauri::AppHandle,
 ) -> Result<SwitchResponse, ApiError> {
-    let mut manager = state.account_manager.lock().unwrap();
-    
-    // Get the account
-    let account = match manager.get_account(&account_id) {
-        Some(acc) => acc,
-        None => {
-            return Ok(SwitchResponse {
-                success: false,
-                email: None,
-                error: Some("Account not found".to_string()),
-            });
-        }
-    };
-    
-    // Refresh token if needed
-    let access_token = if account.access_token.is_none() || 
-        account.expires_at.map(|exp| chrono::Utc::now().timestamp_millis() > exp - 300000).unwrap_or(true) {
-        match oauth::refresh_access_token(&account.refresh_token).await {
-            Ok(token_data) => {
-                manager.update_account_token(&account_id, &token_data.access_token, token_data.expires_in)?;
-                token_data.access_token
-            }
-            Err(e) => {
+    // Get the account first, then release the lock
+    let account = {
+        let manager = state.account_manager.lock().unwrap();
+        match manager.get_account(&account_id) {
+            Some(acc) => acc,
+            None => {
                 return Ok(SwitchResponse {
                     success: false,
                     email: None,
-                    error: Some(format!("Token refresh failed: {}", e)),
+                    error: Some("Account not found".to_string()),
+                });
+            }
+        }
+    };
+    
+    // Refresh token if needed (outside the lock)
+    let access_token = if account.access_token.is_none() ||
+        account.expires_at.map(|exp| chrono::Utc::now().timestamp_millis() > exp - 300000).unwrap_or(true) {
+        match oauth::refresh_access_token(&account.refresh_token).await {
+            Ok(token_data) => {
+                // Re-acquire lock to update token
+                let mut manager = state.account_manager.lock().unwrap();
+                manager.update_account_token(&account_id, &token_data.access_token, token_data.expires_in)?;
+                token_data.access_token
+            }
+            Err(_e) => {
+                return Ok(SwitchResponse {
+                    success: false,
+                    email: None,
+                    error: Some("Token refresh failed".to_string()),
                 });
             }
         }
@@ -218,7 +230,9 @@ async fn switch_account(
     match switch::inject_token_into_db(&access_token, &account.refresh_token, expiry, &account.email).await {
         Ok(_) => {
             // Mark account as active
+            let mut manager = state.account_manager.lock().unwrap();
             manager.set_active_account(&account_id)?;
+            drop(manager); // Release lock before restart
             
             // Restart Antigravity
             if let Err(e) = switch::restart_antigravity().await {
@@ -231,14 +245,14 @@ async fn switch_account(
                 error: None,
             })
         }
-        Err(e) => {
+        Err(_e) => {
             // Try to restart Antigravity anyway - the token might still work on next launch
             let _ = switch::restart_antigravity().await;
             
             Ok(SwitchResponse {
                 success: false,
                 email: None,
-                error: Some(format!("Database injection failed: {}", e)),
+                error: Some("Database injection failed".to_string()),
             })
         }
     }
@@ -312,7 +326,7 @@ async fn handle_oauth_callback(
     // Exchange code for tokens
     let tokens = match oauth::exchange_code_for_tokens(&code).await {
         Ok(t) => t,
-        Err(e) => {
+        Err(_e) => {
             return Ok(AccountResponse {
                 success: false,
                 account: None,
@@ -323,7 +337,7 @@ async fn handle_oauth_callback(
     // Get user info
     let user_info = match oauth::get_user_info(&tokens.access_token).await {
         Ok(u) => u,
-        Err(e) => {
+        Err(_e) => {
             return Ok(AccountResponse {
                 success: false,
                 account: None,
@@ -347,8 +361,11 @@ async fn refresh_quota(
     account_id: String,
     state: State<'_, AppState>,
 ) -> Result<Option<QuotaInfo>, ApiError> {
-    let manager = state.account_manager.lock().unwrap();
-    let account = manager.get_account(&account_id);
+    // Get account first, then release the lock before await
+    let account = {
+        let manager = state.account_manager.lock().unwrap();
+        manager.get_account(&account_id)
+    };
     
     if let Some(acc) = account {
         match quota::fetch_quota(&acc).await {
@@ -376,9 +393,9 @@ fn main() {
 
     // Create system tray menu
     let tray_menu = SystemTrayMenu::new()
-        .add_item(SystemTrayMenuItem::new("Show", "show"))
-        .add_native_item(SystemTrayMenuItem::Separator)
-        .add_item(SystemTrayMenuItem::new("Quit", "quit"));
+        .add_item(CustomMenuItem::new("show", "Show"))
+        .add_native_item(tauri::SystemTrayMenuItem::Separator)
+        .add_item(CustomMenuItem::new("quit", "Quit"));
 
     let system_tray = SystemTray::new().with_menu(tray_menu);
 

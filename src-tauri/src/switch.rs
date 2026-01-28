@@ -4,8 +4,6 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 
-use crate::account::get_data_dir;
-
 /// Kill Antigravity processes
 pub async fn kill_antigravity() -> anyhow::Result<()> {
     #[cfg(target_os = "macos")]
@@ -137,8 +135,12 @@ pub async fn inject_token_into_db(
         anyhow::bail!("Antigravity database not found at {:?}", db_path);
     }
     
-    // Make database writable
-    let _ = fs::set_permissions(&db_path, std::fs::Permissions::from_mode(0o644));
+    // Make database writable (Unix only)
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(&db_path, std::fs::Permissions::from_mode(0o644));
+    }
     
     // Try to use sqlite3 command line tool
     let jetski_key = "jetskiStateSync.agentManagerInitState";
@@ -246,16 +248,16 @@ fn create_oauth_field(access_token: &str, refresh_token: &str, expiry: i64) -> V
     
     // Field 4: expiry timestamp
     let mut timestamp_parts = Vec::new();
-    add_varint(&mut timestamp_parts, (1 << 3) | 0); // Field 1, wire type 0
+    add_varint(&mut timestamp_parts, ((1 << 3) | 0) as u64); // Field 1, wire type 0
     add_varint(&mut timestamp_parts, expiry as u64);
     
-    add_varint(&mut parts, (4 << 3) | 2); // Field 4, wire type 2 (length-delimited)
+    add_varint(&mut parts, ((4 << 3) | 2) as u64); // Field 4, wire type 2 (length-delimited)
     add_varint(&mut parts, timestamp_parts.len() as u64);
     parts.extend_from_slice(&timestamp_parts);
     
     // Wrap in field 6
     let mut result = Vec::new();
-    add_varint(&mut result, (6 << 3) | 2); // Field 6, wire type 2
+    add_varint(&mut result, ((6 << 3) | 2) as u64); // Field 6, wire type 2
     add_varint(&mut result, parts.len() as u64);
     result.extend_from_slice(&parts);
     
@@ -264,7 +266,7 @@ fn create_oauth_field(access_token: &str, refresh_token: &str, expiry: i64) -> V
 
 /// Add a string field to protobuf
 fn add_string_field(parts: &mut Vec<u8>, field_num: u32, value: &str) {
-    add_varint(parts, (field_num << 3) | 2); // Wire type 2 = length-delimited
+    add_varint(parts, ((field_num << 3) | 2) as u64); // Wire type 2 = length-delimited
     add_varint(parts, value.len() as u64);
     parts.extend_from_slice(value.as_bytes());
 }
@@ -317,6 +319,3 @@ mod base64 {
         result
     }
 }
-
-#[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
