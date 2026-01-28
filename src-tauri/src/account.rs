@@ -26,6 +26,7 @@ pub struct Account {
 
 /// Account manager handles all account operations
 pub struct AccountManager {
+    #[allow(dead_code)]
     data_dir: PathBuf,
     accounts_file: PathBuf,
 }
