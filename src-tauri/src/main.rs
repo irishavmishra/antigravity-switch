@@ -350,11 +350,61 @@ fn open_url(url: String) -> Result<(), ApiError> {
     Ok(())
 }
 
-/// Start OAuth flow
+/// Start OAuth flow - opens browser and waits for callback
 #[tauri::command]
-async fn start_oauth_flow() -> Result<String, ApiError> {
+async fn start_oauth_flow(app_handle: tauri::AppHandle) -> Result<AccountResponse, ApiError> {
+    // Get auth URL
     let auth_url = oauth::get_auth_url()?;
-    Ok(auth_url)
+    
+    // Open browser
+    if let Err(e) = open::that(&auth_url) {
+        return Err(ApiError {
+            error: format!("Failed to open browser: {}", e),
+        });
+    }
+    
+    // Start server and wait for callback (this blocks until user authorizes)
+    let auth_code = match oauth::start_oauth_server().await {
+        Ok(code) => code,
+        Err(e) => {
+            return Ok(AccountResponse {
+                success: false,
+                account: None,
+            });
+        }
+    };
+    
+    // Exchange code for tokens
+    let tokens = match oauth::exchange_code_for_tokens(&auth_code).await {
+        Ok(t) => t,
+        Err(_e) => {
+            return Ok(AccountResponse {
+                success: false,
+                account: None,
+            });
+        }
+    };
+    
+    // Get user info
+    let user_info = match oauth::fetch_user_info(&tokens.access_token).await {
+        Ok(u) => u,
+        Err(_e) => {
+            return Ok(AccountResponse {
+                success: false,
+                account: None,
+            });
+        }
+    };
+    
+    // Add or update account
+    let state = app_handle.state::<AppState>();
+    let mut manager = state.account_manager.lock().unwrap();
+    let account = manager.add_or_update_oauth_account(user_info, tokens)?;
+    
+    Ok(AccountResponse {
+        success: true,
+        account: Some(account),
+    })
 }
 
 /// Handle OAuth callback

@@ -206,3 +206,122 @@ pub async fn fetch_user_info(access_token: &str) -> anyhow::Result<UserInfo> {
         picture: user_info["picture"].as_str().map(|s| s.to_string()),
     })
 }
+
+/// Start local OAuth callback server and wait for authorization code
+pub async fn start_oauth_server() -> anyhow::Result<String> {
+    use tokio::net::TcpListener;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use std::time::Duration;
+    
+    let listener = TcpListener::bind("127.0.0.1:3847").await?;
+    println!("OAuth callback server listening on http://localhost:3847");
+    
+    // Set a timeout for the OAuth callback (5 minutes)
+    let timeout = tokio::time::timeout(Duration::from_secs(300), async {
+        loop {
+            let (mut socket, _) = listener.accept().await?;
+            let mut buffer = [0u8; 4096];
+            let n = socket.read(&mut buffer).await?;
+            let request = String::from_utf8_lossy(&buffer[..n]);
+            
+            // Parse the request to extract the authorization code
+            if let Some(code) = extract_auth_code(&request) {
+                // Send success response to browser
+                let response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n\
+                    <!DOCTYPE html>\
+                    <html><head><title>Success</title></head>\
+                    <body style='font-family: sans-serif; text-align: center; padding: 50px;'>\
+                    <h1 style='color: #4CAF50;'>✓ Authorization Successful</h1>\
+                    <p>You can close this window and return to the app.</p>\
+                    </body></html>";
+                socket.write_all(response.as_bytes()).await?;
+                socket.flush().await?;
+                return Ok::<String, anyhow::Error>(code);
+            } else if request.contains("error=") {
+                // Handle error response
+                let error = extract_error(&request).unwrap_or_else(|| "Unknown error".to_string());
+                let response = format!("HTTP/1.1 400 Bad Request\r\nContent-Type: text/html\r\n\r\n\
+                    <!DOCTYPE html>\
+                    <html><head><title>Error</title></head>\
+                    <body style='font-family: sans-serif; text-align: center; padding: 50px;'>\
+                    <h1 style='color: #f44336;'>✗ Authorization Failed</h1>\
+                    <p>{}</p>\
+                    </body></html>", error);
+                socket.write_all(response.as_bytes()).await?;
+                socket.flush().await?;
+                return Err(anyhow::anyhow!("OAuth error: {}", error));
+            } else {
+                // Not the callback request, continue listening
+                let response = "HTTP/1.1 404 Not Found\r\n\r\n";
+                let _ = socket.write_all(response.as_bytes()).await;
+            }
+        }
+    });
+    
+    match timeout.await {
+        Ok(Ok(code)) => Ok(code),
+        Ok(Err(e)) => Err(e),
+        Err(_) => Err(anyhow::anyhow!("OAuth timeout - no response received within 5 minutes")),
+    }
+}
+
+/// Extract authorization code from HTTP request
+fn extract_auth_code(request: &str) -> Option<String> {
+    // Look for code parameter in the request line or body
+    for line in request.lines() {
+        if line.starts_with("GET /auth/callback") {
+            if let Some(code_start) = line.find("code=") {
+                let after_code = &line[code_start + 5..];
+                let code_end = after_code.find(&[' ', '&'][..]).unwrap_or(after_code.len());
+                let code = &after_code[..code_end];
+                // URL decode the code
+                return Some(url_decode(code));
+            }
+        }
+    }
+    None
+}
+
+/// Extract error from OAuth error response
+fn extract_error(request: &str) -> Option<String> {
+    for line in request.lines() {
+        if line.starts_with("GET /auth/callback") {
+            if let Some(error_start) = line.find("error=") {
+                let after_error = &line[error_start + 6..];
+                let error_end = after_error.find(&[' ', '&'][..]).unwrap_or(after_error.len());
+                return Some(url_decode(&after_error[..error_end]));
+            }
+        }
+    }
+    None
+}
+
+/// Simple URL decode function
+fn url_decode(s: &str) -> String {
+    let mut result = String::new();
+    let mut chars = s.chars().peekable();
+    
+    while let Some(c) = chars.next() {
+        if c == '%' {
+            let hex1 = chars.next();
+            let hex2 = chars.next();
+            if let (Some(h1), Some(h2)) = (hex1, hex2) {
+                if let Ok(byte) = u8::from_str_radix(&format!("{}{}", h1, h2), 16) {
+                    result.push(byte as char);
+                } else {
+                    result.push('%');
+                    result.push(h1);
+                    result.push(h2);
+                }
+            } else {
+                result.push('%');
+            }
+        } else if c == '+' {
+            result.push(' ');
+        } else {
+            result.push(c);
+        }
+    }
+    
+    result
+}

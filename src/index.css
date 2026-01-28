@@ -1,8 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 @layer base {
   :root {
@@ -27,25 +27,25 @@
     --input: 240 10% 15%;
     --ring: 82 100% 59%;
     --radius: 0.75rem;
-    
+
     /* Custom neon colors */
     --neon-lime: #B6FF2E;
     --neon-purple: #7B2BFF;
     --neon-cyan: #2BE8FF;
     --neon-pink: #FF2B7B;
     --neon-orange: #FF9F2B;
-    
+
     /* Surface colors */
     --surface-primary: #07070A;
     --surface-secondary: #0F0F14;
     --surface-tertiary: #1A1A22;
     --surface-elevated: #22222C;
-    
+
     /* Text colors */
     --text-primary: #F4F6FA;
     --text-secondary: #A7ACB8;
     --text-tertiary: #6B7280;
-    
+
     /* Sidebar */
     --sidebar-background: 240 15% 5%;
     --sidebar-foreground: 220 20% 97%;
@@ -62,202 +62,251 @@
   * {
     @apply border-border;
   }
-  
+
   html {
     @apply antialiased;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  
+
   body {
     @apply bg-[var(--surface-primary)] text-[var(--text-primary)];
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     overflow: hidden;
     user-select: none;
   }
-  
+
   /* Custom scrollbar */
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
   }
-  
+
   ::-webkit-scrollbar-track {
     background: transparent;
   }
-  
+
   ::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.1);
     border-radius: 4px;
   }
-  
+
   ::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.15);
   }
 }
 
 @layer components {
+
   /* SwiftUI-inspired Card Styles */
   .swift-card {
     @apply bg-[var(--surface-secondary)] rounded-2xl border border-white/[0.06];
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 
-                inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.03);
   }
-  
+
   .swift-card-elevated {
     @apply bg-[var(--surface-tertiary)] rounded-2xl border border-white/[0.08];
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5),
-                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
   }
-  
+
   /* Glass morphism effect */
   .glass-panel {
     @apply backdrop-blur-xl bg-white/[0.03] border border-white/[0.06];
   }
-  
+
   /* Neon glow effects */
   .neon-glow-lime {
     box-shadow: 0 0 20px rgba(182, 255, 46, 0.3),
-                0 0 40px rgba(182, 255, 46, 0.1);
+      0 0 40px rgba(182, 255, 46, 0.1);
   }
-  
+
   .neon-glow-purple {
     box-shadow: 0 0 20px rgba(123, 43, 255, 0.3),
-                0 0 40px rgba(123, 43, 255, 0.1);
+      0 0 40px rgba(123, 43, 255, 0.1);
   }
-  
+
   .neon-text-lime {
     text-shadow: 0 0 20px rgba(182, 255, 46, 0.5);
   }
-  
+
   /* Button styles */
   .btn-primary {
     @apply bg-[var(--neon-lime)] text-[var(--surface-primary)] font-semibold px-5 py-2.5 rounded-full;
     @apply transition-all duration-200 ease-out;
   }
-  
+
   .btn-primary:hover {
     filter: brightness(1.1);
     transform: scale(1.02);
   }
-  
+
   .btn-primary:active {
     transform: scale(0.98);
   }
-  
+
   .btn-secondary {
     @apply bg-[var(--surface-tertiary)] text-[var(--text-primary)] font-medium px-5 py-2.5 rounded-full;
     @apply border border-white/[0.08];
     @apply transition-all duration-200 ease-out;
   }
-  
+
   .btn-secondary:hover {
     @apply bg-[var(--surface-elevated)];
     border-color: rgba(255, 255, 255, 0.12);
   }
-  
+
   .btn-secondary:active {
     transform: scale(0.98);
   }
-  
+
   .btn-destructive {
     @apply bg-red-500/10 text-red-400 font-medium px-5 py-2.5 rounded-full;
     @apply border border-red-500/20;
     @apply transition-all duration-200 ease-out;
   }
-  
+
   .btn-destructive:hover {
     @apply bg-red-500/20;
   }
-  
+
   .btn-destructive:active {
     transform: scale(0.98);
   }
-  
+
   /* Form inputs */
   .swift-input {
     @apply bg-[var(--surface-tertiary)] text-[var(--text-primary)] px-4 py-3 rounded-xl;
     @apply border border-white/[0.06];
     @apply transition-all duration-200;
   }
-  
+
   .swift-input:focus {
     @apply outline-none ring-2;
     border-color: rgba(182, 255, 46, 0.5);
     --tw-ring-color: rgba(182, 255, 46, 0.2);
   }
-  
+
   .swift-input::placeholder {
     @apply text-[var(--text-tertiary)];
   }
-  
+
   /* Progress bar */
   .quota-bar {
     @apply h-1.5 rounded-full bg-white/10 overflow-hidden;
   }
-  
+
   .quota-fill {
     @apply h-full rounded-full transition-all duration-500;
   }
-  
-  .quota-high { @apply bg-[var(--neon-lime)]; }
-  .quota-medium { @apply bg-[var(--neon-orange)]; }
-  .quota-low { @apply bg-red-500; }
-  
+
+  .quota-high {
+    @apply bg-[var(--neon-lime)];
+  }
+
+  .quota-medium {
+    @apply bg-[var(--neon-orange)];
+  }
+
+  .quota-low {
+    @apply bg-red-500;
+  }
+
   /* Animations */
   @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
-  
+
   @keyframes slideIn {
-    from { opacity: 0; transform: translateX(-20px); }
-    to { opacity: 1; transform: translateX(0); }
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
   }
-  
+
   @keyframes pulse-glow {
-    0%, 100% { box-shadow: 0 0 20px rgba(182, 255, 46, 0.3); }
-    50% { box-shadow: 0 0 30px rgba(182, 255, 46, 0.5); }
+
+    0%,
+    100% {
+      box-shadow: 0 0 20px rgba(182, 255, 46, 0.3);
+    }
+
+    50% {
+      box-shadow: 0 0 30px rgba(182, 255, 46, 0.5);
+    }
   }
-  
+
   @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    from {
+      transform: rotate(0deg);
+    }
+
+    to {
+      transform: rotate(360deg);
+    }
   }
-  
+
   .animate-fade-in {
     animation: fadeIn 0.4s ease-out forwards;
   }
-  
+
   .animate-slide-in {
     animation: slideIn 0.4s ease-out forwards;
   }
-  
+
   .animate-pulse-glow {
     animation: pulse-glow 2s ease-in-out infinite;
   }
-  
+
   .animate-spin-slow {
     animation: spin 1s linear infinite;
   }
-  
+
   /* Stagger animation delays */
-  .stagger-1 { animation-delay: 0.05s; }
-  .stagger-2 { animation-delay: 0.1s; }
-  .stagger-3 { animation-delay: 0.15s; }
-  .stagger-4 { animation-delay: 0.2s; }
-  .stagger-5 { animation-delay: 0.25s; }
+  .stagger-1 {
+    animation-delay: 0.05s;
+  }
+
+  .stagger-2 {
+    animation-delay: 0.1s;
+  }
+
+  .stagger-3 {
+    animation-delay: 0.15s;
+  }
+
+  .stagger-4 {
+    animation-delay: 0.2s;
+  }
+
+  .stagger-5 {
+    animation-delay: 0.25s;
+  }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
-  
+
   .grain-overlay {
     position: relative;
   }
-  
+
   .grain-overlay::after {
     content: '';
     position: absolute;

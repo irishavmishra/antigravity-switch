@@ -14,17 +14,17 @@ import { AddAccountModal } from '@/components/AddAccountModal';
 import { SettingsView } from '@/components/SettingsView';
 import { AboutView } from '@/components/AboutView';
 import { ToastProvider, useToast } from '@/hooks/use-toast';
-import { getAccounts, exportAccounts, importAccounts, openUrl } from '@/lib/tauri-api';
+import { getAccounts, exportAccounts, importAccounts } from '@/lib/tauri-api';
 import type { Account } from '@/types';
 
 // Accounts View Component
-function AccountsView({ 
-  accounts, 
-  isRefreshing, 
-  onRefresh, 
+function AccountsView({
+  accounts,
+  isRefreshing,
+  onRefresh,
   onAddAccount,
-  onUpdate 
-}: { 
+  onUpdate
+}: {
   accounts: Account[];
   isRefreshing: boolean;
   onRefresh: () => void;
@@ -32,34 +32,34 @@ function AccountsView({
   onUpdate: () => void;
 }) {
   const activeAccount = accounts.find(a => a.is_active);
-  const lastUpdated = activeAccount?.last_checked 
+  const lastUpdated = activeAccount?.last_checked
     ? new Date(activeAccount.last_checked).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : '-';
 
   return (
     <div className="flex flex-col h-full">
-      <Header 
-        title="Accounts" 
+      <Header
+        title="Accounts"
         onRefresh={onRefresh}
         onAddAccount={onAddAccount}
         isRefreshing={isRefreshing}
       />
-      
+
       <div className="flex-1 overflow-y-auto p-8">
-        <StatsCard 
+        <StatsCard
           totalAccounts={accounts.length}
           activeAccount={activeAccount?.name || 'None'}
           lastUpdated={lastUpdated}
         />
-        
+
         {accounts.length === 0 ? (
           <EmptyState onAddAccount={onAddAccount} />
         ) : (
           <div className="space-y-4">
             {accounts.map((account) => (
-              <AccountCard 
-                key={account.id} 
-                account={account} 
+              <AccountCard
+                key={account.id}
+                account={account}
                 onUpdate={onUpdate}
               />
             ))}
@@ -108,13 +108,13 @@ function AppContent() {
   const handleExport = async () => {
     try {
       const json = await exportAccounts();
-      
+
       // Use Tauri dialog to save file
       const savePath = await save({
         filters: [{ name: 'JSON', extensions: ['json'] }],
         defaultPath: 'antigravity-accounts.json',
       });
-      
+
       if (savePath) {
         await writeTextFile(savePath, json);
         showToast('Accounts exported successfully', 'success');
@@ -132,16 +132,16 @@ function AppContent() {
         filters: [{ name: 'JSON', extensions: ['json'] }],
         multiple: false,
       });
-      
+
       if (selected && typeof selected === 'string') {
         const content = await readTextFile(selected);
         const result = await importAccounts(content);
-        
+
         showToast(
           `Imported ${result.added} accounts, updated ${result.updated}`,
           'success'
         );
-        
+
         await loadAccounts();
       }
     } catch (error) {
@@ -152,11 +152,20 @@ function AppContent() {
 
   const handleNewLogin = async () => {
     try {
-      const authUrl = await invoke<string>('start_oauth_flow');
-      await openUrl(authUrl);
-      showToast('Opening browser for OAuth...', 'info');
+      showToast('Opening browser for Google OAuth...', 'info');
+      const response = await invoke<{
+        success: boolean;
+        account: Account | null;
+      }>('start_oauth_flow');
+
+      if (response.success && response.account) {
+        showToast(`Successfully added account: ${response.account.email}`, 'success');
+        await loadAccounts();
+      } else {
+        showToast('OAuth failed or was cancelled', 'error');
+      }
     } catch (error) {
-      showToast('Failed to start OAuth flow', 'error');
+      showToast('Failed to complete OAuth flow', 'error');
       console.error('OAuth error:', error);
     }
   };
@@ -191,11 +200,11 @@ function AppContent() {
         onExport={handleExport}
         onNewLogin={handleNewLogin}
       />
-      
+
       <main className="flex-1 overflow-hidden">
         {renderView()}
       </main>
-      
+
       <AddAccountModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}

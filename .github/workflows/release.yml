@@ -62,6 +62,6 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'Antigravity Switch v__VERSION__'
           releaseBody: 'See the assets to download and install this version.'
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
