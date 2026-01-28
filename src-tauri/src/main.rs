@@ -229,10 +229,11 @@ async fn switch_account(
     let expiry = chrono::Utc::now().timestamp() + 3600;
     match switch::inject_token_into_db(&access_token, &account.refresh_token, expiry, &account.email).await {
         Ok(_) => {
-            // Mark account as active
-            let mut manager = state.account_manager.lock().unwrap();
-            manager.set_active_account(&account_id)?;
-            drop(manager); // Release lock before restart
+            // Mark account as active in a scope to ensure lock is released
+            {
+                let mut manager = state.account_manager.lock().unwrap();
+                manager.set_active_account(&account_id)?;
+            } // Lock released here before await
             
             // Restart Antigravity
             if let Err(e) = switch::restart_antigravity().await {
