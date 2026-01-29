@@ -9,24 +9,24 @@ export function SettingsView() {
   const [dataDir, setDataDir] = useState('');
   const { showToast } = useToast();
 
-  useEffect(() => {
-    loadDataDir();
-  }, []);
-
   const loadDataDir = async () => {
     try {
       const dir = await getDataDir();
       setDataDir(dir);
-    } catch (error) {
-      console.error('Failed to get data directory:', error);
+    } catch (_err) {
+      console.error('Failed to get data directory:', _err);
     }
   };
+
+  useEffect(() => {
+    loadDataDir();
+  }, []);
 
   const handleOpenDataDir = async () => {
     try {
       // Open the data directory in file explorer
       await openUrl(`file://${dataDir}`);
-    } catch (error) {
+    } catch (_err) {
       showToast('Failed to open data directory', 'error');
     }
   };
@@ -43,7 +43,7 @@ export function SettingsView() {
           <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">
             Data Directory
           </h3>
-          
+
           <div className="flex items-center gap-3">
             <code className="flex-1 px-4 py-3 rounded-xl bg-[var(--surface-tertiary)] text-[var(--text-secondary)] text-sm font-mono truncate">
               {dataDir}
@@ -56,7 +56,7 @@ export function SettingsView() {
               <FolderOpen className="w-5 h-5" />
             </button>
           </div>
-          
+
           <p className="text-[12px] text-[var(--text-tertiary)] mt-3">
             Your account data and tokens are stored locally in this directory.
           </p>
@@ -67,13 +67,13 @@ export function SettingsView() {
           <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">
             About
           </h3>
-          
+
           <div className="space-y-3">
             <div className="flex items-center justify-between py-2">
               <span className="text-sm text-[var(--text-secondary)]">Version</span>
               <span className="text-sm text-[var(--text-primary)] font-medium">1.0.0</span>
             </div>
-            
+
             <div className="flex items-center justify-between py-2">
               <span className="text-sm text-[var(--text-secondary)]">Built with</span>
               <span className="text-sm text-[var(--text-primary)] font-medium">Tauri + React</span>

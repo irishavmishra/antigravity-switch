@@ -108,7 +108,7 @@ function AppContent() {
     try {
       await loadAccounts();
       showToast('Accounts refreshed', 'success');
-    } catch (error) {
+    } catch (_error) {
       showToast('Failed to refresh accounts', 'error');
     } finally {
       setIsRefreshing(false);
@@ -172,7 +172,7 @@ function AppContent() {
         showToast(`Successfully added account: ${response.account.email}`, 'success');
         await loadAccounts();
       } else {
-        const errorMsg = (response as any).error || 'OAuth failed or was cancelled';
+        const errorMsg = 'OAuth failed or was cancelled';
         // Check for specific known errors to provide better formatting
         if (errorMsg.includes("GOOGLE_CLIENT_ID not set")) {
           showToast('Configuration Error: Missing Google OAuth Credentials. See console for details.', 'error');

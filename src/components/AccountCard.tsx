@@ -21,7 +21,7 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
 
   const handleSwitch = async () => {
     if (isSwitching || isActive) return;
-    
+
     setIsSwitching(true);
     try {
       const email = await switchAccount(account.id);
@@ -36,16 +36,16 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
 
   const handleDelete = async () => {
     if (isDeleting) return;
-    
+
     const confirmed = await confirm(`Delete account for ${account.email}?`);
     if (!confirmed) return;
-    
+
     setIsDeleting(true);
     try {
       await deleteAccount(account.id);
       showToast('Account deleted', 'success');
       onUpdate();
-    } catch (error) {
+    } catch (_error) {
       showToast('Failed to delete account', 'error');
       setIsDeleting(false);
     }
@@ -76,7 +76,7 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
   const resetTimeFormatted = formatResetTime(maxResetTime);
 
   return (
-    <div 
+    <div
       className={`
         swift-card overflow-hidden transition-all duration-300
         ${isActive ? 'ring-1 ring-[var(--neon-lime)]/50' : ''}
@@ -86,18 +86,18 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
       <div className="p-5 flex items-center justify-between">
         <div className="flex items-center gap-4">
           {/* Avatar */}
-          <div 
+          <div
             className={`
               w-11 h-11 rounded-full flex items-center justify-center text-lg font-bold
-              ${isActive 
-                ? 'bg-gradient-to-br from-[var(--neon-lime)] to-[var(--neon-cyan)] text-[var(--surface-primary)]' 
+              ${isActive
+                ? 'bg-gradient-to-br from-[var(--neon-lime)] to-[var(--neon-cyan)] text-[var(--surface-primary)]'
                 : 'bg-gradient-to-br from-[var(--neon-purple)] to-blue-500 text-white'
               }
             `}
           >
             {initial}
           </div>
-          
+
           {/* Info */}
           <div>
             <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">
@@ -117,7 +117,7 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
               Active
             </span>
           )}
-          
+
           <button
             onClick={handleDelete}
             disabled={isDeleting}
@@ -148,11 +148,11 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
                     {model.display_name}
                   </span>
                   {model.badge && (
-                    <span 
+                    <span
                       className="px-1.5 py-0.5 rounded text-[10px] font-semibold"
-                      style={{ 
+                      style={{
                         backgroundColor: `${model.badge.color}20`,
-                        color: model.badge.color 
+                        color: model.badge.color
                       }}
                     >
                       {model.badge.text}
@@ -163,9 +163,9 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
                   {model.percentage}%
                 </span>
               </div>
-              
+
               <div className="quota-bar">
-                <div 
+                <div
                   className={`quota-fill ${getQuotaColor(model.percentage)}`}
                   style={{ width: `${model.percentage}%` }}
                 />
@@ -183,8 +183,8 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
           w-full py-3.5 px-5 flex items-center justify-center gap-2
           text-sm font-semibold transition-all duration-200
           border-t border-white/[0.06]
-          ${isActive 
-            ? 'text-[var(--neon-lime)] cursor-default' 
+          ${isActive
+            ? 'text-[var(--neon-lime)] cursor-default'
             : 'text-[var(--neon-lime)] hover:bg-[var(--neon-lime)]/5'
           }
         `}
