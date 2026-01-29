@@ -14,8 +14,9 @@ import { EmptyState } from '@/components/EmptyState';
 import { AddAccountModal } from '@/components/AddAccountModal';
 import { SettingsView } from '@/components/SettingsView';
 import { AboutView } from '@/components/AboutView';
-import { ToastProvider, useToast } from '@/hooks/use-toast';
-import { getAccounts, exportAccounts, importAccounts } from '@/lib/tauri-api';
+import { ToastProvider } from '@/hooks/toast-provider';
+import { useToast } from '@/hooks/use-toast';
+import { getAccounts, exportAccounts, exportAccountsSimple, importAccounts } from '@/lib/tauri-api';
 import type { Account } from '@/types';
 
 // Accounts View Component
@@ -136,6 +137,26 @@ function AppContent() {
     }
   };
 
+  const handleExportSimple = async () => {
+    try {
+      const json = await exportAccountsSimple();
+
+      // Use Tauri dialog to save file
+      const savePath = await save({
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+        defaultPath: 'antigravity-accounts-backup.json',
+      });
+
+      if (savePath) {
+        await writeTextFile(savePath, json);
+        showToast('Accounts exported (simple format) successfully', 'success');
+      }
+    } catch (error) {
+      showToast('Failed to export accounts', 'error');
+      console.error('Export error:', error);
+    }
+  };
+
   const handleImport = async () => {
     try {
       // Use Tauri dialog to open file
@@ -167,13 +188,15 @@ function AppContent() {
       const response = await invoke<{
         success: boolean;
         account: Account | null;
+        error?: string;
       }>('start_oauth_flow');
 
       if (response.success && response.account) {
         showToast(`Successfully added account: ${response.account.email}`, 'success');
         await loadAccounts();
       } else {
-        const errorMsg = 'OAuth failed or was cancelled';
+        // Use the actual error message from the backend
+        const errorMsg = response.error || 'OAuth failed or was cancelled';
         // Check for specific known errors to provide better formatting
         if (errorMsg.includes("GOOGLE_CLIENT_ID not set")) {
           showToast('Configuration Error: Missing Google OAuth Credentials. See console for details.', 'error');
@@ -224,6 +247,7 @@ function AppContent() {
         onViewChange={setActiveView}
         onImport={handleImport}
         onExport={handleExport}
+        onExportSimple={handleExportSimple}
         onNewLogin={handleNewLogin}
       />
 

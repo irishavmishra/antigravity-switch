@@ -279,12 +279,38 @@ async fn get_active_account(state: State<'_, AppState>) -> Result<AccountRespons
     })
 }
 
-/// Export accounts to JSON
+/// Simple account format for import/export (email + refresh_token only)
+#[derive(Debug, Serialize, Deserialize)]
+struct SimpleAccount {
+    email: String,
+    refresh_token: String,
+}
+
+/// Export accounts to JSON (full format)
 #[tauri::command]
 async fn export_accounts(state: State<'_, AppState>) -> Result<String, ApiError> {
     let manager = state.account_manager.lock().unwrap();
     let accounts = manager.load_accounts()?;
     let json = serde_json::to_string_pretty(&accounts)?;
+    Ok(json)
+}
+
+/// Export accounts to JSON (simple format - email and refresh_token only)
+#[tauri::command]
+async fn export_accounts_simple(state: State<'_, AppState>) -> Result<String, ApiError> {
+    let manager = state.account_manager.lock().unwrap();
+    let accounts = manager.load_accounts()?;
+    
+    // Convert to simple format
+    let simple_accounts: Vec<SimpleAccount> = accounts
+        .into_iter()
+        .map(|acc| SimpleAccount {
+            email: acc.email,
+            refresh_token: acc.refresh_token,
+        })
+        .collect();
+    
+    let json = serde_json::to_string_pretty(&simple_accounts)?;
     Ok(json)
 }
 
@@ -297,33 +323,84 @@ async fn import_accounts(
     // Try to parse as array first
     let imported: Vec<Account> = match serde_json::from_str(&json_data) {
         Ok(accounts) => accounts,
-        Err(e) => {
-            // Check if it's a single object wrapped in an object with an "accounts" key
-            let wrapper: serde_json::Value = match serde_json::from_str(&json_data) {
-                Ok(v) => v,
-                Err(_) => return Err(ApiError::from(e)),
-            };
-            
-            // Try to extract accounts array from wrapper object
-            if let Some(accounts_array) = wrapper.get("accounts").or_else(|| wrapper.get("data")) {
-                match serde_json::from_value(accounts_array.clone()) {
-                    Ok(accounts) => accounts,
-                    Err(e2) => {
+        Err(_) => {
+            // Try parsing as simple format (array of {email, refresh_token})
+            match serde_json::from_str::<Vec<SimpleAccount>>(&json_data) {
+                Ok(simple_accounts) => {
+                    // Convert simple format to full Account format
+                    simple_accounts
+                        .into_iter()
+                        .map(|simple| Account {
+                            id: String::new(), // Will be assigned during import
+                            email: simple.email,
+                            name: None,
+                            picture: None,
+                            refresh_token: simple.refresh_token,
+                            access_token: None,
+                            expires_at: None,
+                            is_active: false,
+                            added_at: 0, // Will be set during import
+                            last_switched: None,
+                            last_checked: None,
+                        })
+                        .collect()
+                }
+                Err(_) => {
+                    // Check if it's a single object wrapped in an object with an "accounts" key
+                    let wrapper: serde_json::Value = match serde_json::from_str(&json_data) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            return Err(ApiError {
+                                error: format!(
+                                    "Invalid JSON format. Expected an array of accounts with 'email' and 'refresh_token' fields. Error: {}",
+                                    e
+                                ),
+                            });
+                        }
+                    };
+                    
+                    // Try to extract accounts array from wrapper object
+                    if let Some(accounts_array) = wrapper.get("accounts").or_else(|| wrapper.get("data")) {
+                        match serde_json::from_value(accounts_array.clone()) {
+                            Ok(accounts) => accounts,
+                            Err(_) => {
+                                // Try simple format from wrapper
+                                match serde_json::from_value::<Vec<SimpleAccount>>(accounts_array.clone()) {
+                                    Ok(simple_accounts) => {
+                                        simple_accounts
+                                            .into_iter()
+                                            .map(|simple| Account {
+                                                id: String::new(),
+                                                email: simple.email,
+                                                name: None,
+                                                picture: None,
+                                                refresh_token: simple.refresh_token,
+                                                access_token: None,
+                                                expires_at: None,
+                                                is_active: false,
+                                                added_at: 0,
+                                                last_switched: None,
+                                                last_checked: None,
+                                            })
+                                            .collect()
+                                    }
+                                    Err(e2) => {
+                                        return Err(ApiError {
+                                            error: format!(
+                                                "Failed to parse JSON. Expected an array of accounts with 'email' and 'refresh_token' fields. Error: {}",
+                                                e2
+                                            ),
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    } else {
                         return Err(ApiError {
-                            error: format!(
-                                "Failed to parse JSON. Expected an array of accounts or an object with 'accounts' key. Error: {}",
-                                e2
-                            ),
+                            error: "Invalid JSON format. Expected an array of accounts with 'email' and 'refresh_token' fields.".to_string(),
                         });
                     }
                 }
-            } else {
-                return Err(ApiError {
-                    error: format!(
-                        "Invalid JSON format. Expected an array of accounts or an object with 'accounts' key. Error: {}",
-                        e
-                    ),
-                });
             }
         }
     };
@@ -566,6 +643,7 @@ fn main() {
             switch_account,
             get_active_account,
             export_accounts,
+            export_accounts_simple,
             import_accounts,
             get_data_dir,
             open_url,

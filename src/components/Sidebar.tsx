@@ -7,6 +7,7 @@ interface SidebarProps {
   onViewChange: (view: string) => void;
   onImport: () => void;
   onExport: () => void;
+  onExportSimple?: () => void;
   onNewLogin: () => void;
 }
 
@@ -87,6 +88,7 @@ export function Sidebar({
   onViewChange,
   onImport,
   onExport,
+  onExportSimple,
   onNewLogin
 }: SidebarProps) {
   return (
@@ -130,6 +132,13 @@ export function Sidebar({
             label="Export JSON"
             onClick={onExport}
           />
+          {onExportSimple && (
+            <MenuItem
+              icon={<Download className="w-[18px] h-[18px]" />}
+              label="Export Simple"
+              onClick={onExportSimple}
+            />
+          )}
         </MenuGroup>
 
         <MenuGroup title="System">

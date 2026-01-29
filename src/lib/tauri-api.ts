@@ -59,9 +59,14 @@ export async function getActiveAccount(): Promise<Account | null> {
   return null;
 }
 
-// Export accounts
+// Export accounts (full format)
 export async function exportAccounts(): Promise<string> {
   return await invoke<string>('export_accounts');
+}
+
+// Export accounts (simple format - email and refresh_token only)
+export async function exportAccountsSimple(): Promise<string> {
+  return await invoke<string>('export_accounts_simple');
 }
 
 // Import accounts
