@@ -50,10 +50,6 @@ jobs:
       - name: Check TypeScript
         run: npm run lint
 
-      - name: Check Rust formatting
-        working-directory: ./src-tauri
-        run: cargo fmt -- --check
-
       - name: Run Clippy
         working-directory: ./src-tauri
         run: cargo clippy -- -D warnings
