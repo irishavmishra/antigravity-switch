@@ -1,6 +1,7 @@
 // Account management - storage and CRUD operations
 
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -59,7 +60,9 @@ impl AccountManager {
     /// Save accounts to storage
     fn save_accounts(&self, accounts: &[Account]) -> anyhow::Result<()> {
         let content = serde_json::to_string_pretty(accounts)?;
-        fs::write(&self.accounts_file, content)?;
+        let mut file = fs::File::create(&self.accounts_file)?;
+        file.write_all(content.as_bytes())?;
+        file.sync_all()?; // Force flush to disk
         Ok(())
     }
     

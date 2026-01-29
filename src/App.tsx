@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api';
+import { listen } from '@tauri-apps/api/event';
 import { save, open } from '@tauri-apps/api/dialog';
 import { writeTextFile, readTextFile } from '@tauri-apps/api/fs';
 
@@ -78,9 +79,18 @@ function AppContent() {
   const [activeView, setActiveView] = useState('accounts');
   const { showToast } = useToast();
 
-  // Load accounts on mount
+  // Load accounts on mount and listen for updates
   useEffect(() => {
     loadAccounts();
+
+    // Listen for account updates from backend (e.g., after OAuth)
+    const unlisten = listen('accounts-updated', () => {
+      loadAccounts();
+    });
+
+    return () => {
+      unlisten.then(f => f());
+    };
   }, []);
 
   const loadAccounts = async () => {
@@ -162,19 +172,25 @@ function AppContent() {
         showToast(`Successfully added account: ${response.account.email}`, 'success');
         await loadAccounts();
       } else {
-        showToast('OAuth failed or was cancelled', 'error');
+        const errorMsg = (response as any).error || 'OAuth failed or was cancelled';
+        // Check for specific known errors to provide better formatting
+        if (errorMsg.includes("GOOGLE_CLIENT_ID not set")) {
+          showToast('Configuration Error: Missing Google OAuth Credentials. See console for details.', 'error');
+        } else {
+          showToast(errorMsg, 'error');
+        }
       }
     } catch (error) {
       // The backend returns the error message as a string
       const errorMessage = typeof error === 'string' ? error : 'Failed to complete OAuth flow';
-      
+
       // Check for specific known errors to provide better formatting
       if (errorMessage.includes("GOOGLE_CLIENT_ID not set")) {
         showToast('Configuration Error: Missing Google OAuth Credentials. See console for details.', 'error');
       } else {
         showToast(errorMessage, 'error');
       }
-      
+
       console.error('OAuth error:', error);
     }
   };

@@ -66,6 +66,7 @@ struct AccountsResponse {
 struct AccountResponse {
     success: bool,
     account: Option<Account>,
+    error: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -149,6 +150,7 @@ async fn add_account(
             return Ok(AccountResponse {
                 success: false,
                 account: None,
+                error: Some("Token refresh failed during add".to_string()),
             });
         }
     };
@@ -267,6 +269,7 @@ async fn get_active_account(state: State<'_, AppState>) -> Result<AccountRespons
     Ok(AccountResponse {
         success: true,
         account: active,
+        error: None,
     })
 }
 
@@ -353,10 +356,12 @@ fn open_url(url: String) -> Result<(), ApiError> {
 /// Start OAuth flow - opens browser and waits for callback
 #[tauri::command]
 async fn start_oauth_flow(app_handle: tauri::AppHandle) -> Result<AccountResponse, ApiError> {
+    println!("Starting OAuth flow...");
     // Get auth URL
     let auth_url = oauth::get_auth_url()?;
     
     // Open browser
+    println!("Opening browser...");
     if let Err(e) = open::that(&auth_url) {
         return Err(ApiError {
             error: format!("Failed to open browser: {}", e),
@@ -364,46 +369,70 @@ async fn start_oauth_flow(app_handle: tauri::AppHandle) -> Result<AccountRespons
     }
     
     // Start server and wait for callback (this blocks until user authorizes)
+    println!("Waiting for callback...");
     let auth_code = match oauth::start_oauth_server().await {
-        Ok(code) => code,
-        Err(_e) => {
+        Ok(code) => {
+            println!("Received auth code");
+            code
+        },
+        Err(e) => {
+            println!("OAuth server error: {}", e);
             return Ok(AccountResponse {
                 success: false,
                 account: None,
+                error: Some(format!("OAuth server error: {}", e)),
             });
         }
     };
     
     // Exchange code for tokens
+    println!("Exchanging code for tokens...");
     let tokens = match oauth::exchange_code_for_tokens(&auth_code).await {
-        Ok(t) => t,
-        Err(_e) => {
+        Ok(t) => {
+            println!("Tokens received");
+            t
+        },
+        Err(e) => {
+            println!("Token exchange failed: {}", e);
             return Ok(AccountResponse {
                 success: false,
                 account: None,
+                error: Some(format!("Token exchange failed: {}", e)),
             });
         }
     };
     
     // Get user info
+    println!("Fetching user info...");
     let user_info = match oauth::fetch_user_info(&tokens.access_token).await {
-        Ok(u) => u,
-        Err(_e) => {
+        Ok(u) => {
+            println!("User info received: {}", u.email);
+            u
+        },
+        Err(e) => {
+            println!("Fetch user info failed: {}", e);
             return Ok(AccountResponse {
                 success: false,
                 account: None,
+                error: Some(format!("Failed to fetch user info: {}", e)),
             });
         }
     };
     
     // Add or update account
+    println!("Updating account manager...");
     let state = app_handle.state::<AppState>();
     let mut manager = state.account_manager.lock().unwrap();
     let account = manager.add_or_update_oauth_account(user_info, tokens)?;
     
+    // Emit event to notify frontend
+    app_handle.emit_all("accounts-updated", ())?;
+    
+    println!("OAuth flow complete!");
     Ok(AccountResponse {
         success: true,
         account: Some(account),
+        error: None,
     })
 }
 
@@ -416,10 +445,11 @@ async fn handle_oauth_callback(
     // Exchange code for tokens
     let tokens = match oauth::exchange_code_for_tokens(&code).await {
         Ok(t) => t,
-        Err(_e) => {
+        Err(e) => {
             return Ok(AccountResponse {
                 success: false,
                 account: None,
+                error: Some(format!("Token exchange failed: {}", e)),
             });
         }
     };
@@ -427,10 +457,11 @@ async fn handle_oauth_callback(
     // Get user info
     let user_info = match oauth::fetch_user_info(&tokens.access_token).await {
         Ok(u) => u,
-        Err(_e) => {
+        Err(e) => {
             return Ok(AccountResponse {
                 success: false,
                 account: None,
+                error: Some(format!("Failed to fetch user info: {}", e)),
             });
         }
     };
@@ -442,6 +473,7 @@ async fn handle_oauth_callback(
     Ok(AccountResponse {
         success: true,
         account: Some(account),
+        error: None,
     })
 }
 
@@ -495,6 +527,13 @@ fn main() {
     tauri::Builder::default()
         .manage(app_state)
         .system_tray(system_tray)
+        .setup(|app| {
+            // Ensure window is shown and focused on startup
+            let window = app.get_window("main").unwrap();
+            window.show().unwrap();
+            window.set_focus().unwrap();
+            Ok(())
+        })
         .on_system_tray_event(|app, event| match event {
             SystemTrayEvent::LeftClick { .. } => {
                 let window = app.get_window("main").unwrap();

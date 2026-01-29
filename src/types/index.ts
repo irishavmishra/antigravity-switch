@@ -8,6 +8,7 @@ export interface Account {
   quota?: QuotaInfo;
   is_active: boolean;
   last_checked?: number;
+  refresh_token?: string;
 }
 
 export interface QuotaInfo {
