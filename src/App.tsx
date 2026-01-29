@@ -82,10 +82,12 @@ function AppContent() {
 
   // Load accounts on mount and listen for updates
   useEffect(() => {
+    console.log('App mounted, loading accounts...');
     loadAccounts();
 
     // Listen for account updates from backend (e.g., after OAuth)
     const unlisten = listen('accounts-updated', () => {
+      console.log('Received accounts-updated event');
       loadAccounts();
     });
 
@@ -97,7 +99,9 @@ function AppContent() {
 
   const loadAccounts = async () => {
     try {
+      console.log('Loading accounts...');
       const data = await getAccounts();
+      console.log('Accounts loaded:', data);
       setAccounts(data);
     } catch (error) {
       showToast('Failed to load accounts', 'error');
@@ -185,16 +189,22 @@ function AppContent() {
   const handleNewLogin = async () => {
     try {
       showToast('Opening browser for Google OAuth...', 'info');
+      console.log('Starting OAuth flow...');
+
       const response = await invoke<{
         success: boolean;
         account: Account | null;
         error?: string;
       }>('start_oauth_flow');
 
+      console.log('OAuth response:', response);
+
       if (response.success && response.account) {
+        console.log('OAuth successful, account:', response.account);
         showToast(`Successfully added account: ${response.account.email}`, 'success');
         await loadAccounts();
       } else {
+        console.log('OAuth failed:', response.error);
         // Use the actual error message from the backend
         const errorMsg = response.error || 'OAuth failed or was cancelled';
         // Check for specific known errors to provide better formatting
