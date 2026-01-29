@@ -28,3 +28,27 @@ dotenv = "0.15"
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
+
+# Optimized build profiles for faster CI builds
+[profile.dev]
+opt-level = 0
+debug = true
+lto = false
+codegen-units = 256
+panic = 'unwind'
+
+[profile.release]
+opt-level = "z"      # Optimize for size (faster than level 3)
+lto = "thin"         # Thin LTO is faster than fat LTO
+codegen-units = 16   # Parallel compilation units
+panic = 'abort'      # Smaller binary, faster build
+strip = true         # Strip symbols for smaller binary
+
+# CI-optimized profile (balances speed and performance)
+[profile.ci]
+inherits = "release"
+opt-level = 2
+lto = "thin"
+codegen-units = 64
+panic = 'abort'
+strip = true

@@ -55,6 +55,14 @@ impl From<serde_json::Error> for ApiError {
     }
 }
 
+impl From<tauri::Error> for ApiError {
+    fn from(err: tauri::Error) -> Self {
+        ApiError {
+            error: err.to_string(),
+        }
+    }
+}
+
 // API Response types
 #[derive(Serialize)]
 struct AccountsResponse {
@@ -161,6 +169,7 @@ async fn add_account(
     Ok(AccountResponse {
         success: true,
         account: Some(account),
+        error: None,
     })
 }
 

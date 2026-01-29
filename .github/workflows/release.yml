@@ -2,15 +2,19 @@ name: Release
 
 on:
   push:
-    branches:
-      - main
     tags:
       - 'v*'
-  pull_request:
-    branches:
-      - main
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: short
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
 
 jobs:
+  # Build job with aggressive caching
   build:
     permissions:
       contents: write
@@ -21,43 +25,77 @@ jobs:
         include:
           - platform: 'macos-latest'
             args: '--target aarch64-apple-darwin'
+            target: 'aarch64-apple-darwin'
+            arch: 'aarch64'
           - platform: 'macos-latest'
             args: '--target x86_64-apple-darwin'
+            target: 'x86_64-apple-darwin'
+            arch: 'x86_64'
           - platform: 'ubuntu-22.04'
             args: ''
+            target: ''
+            arch: 'x86_64'
           - platform: 'windows-latest'
             args: ''
+            target: ''
+            arch: 'x86_64'
 
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
 
+      # Setup Node.js with caching
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'npm'
 
+      # Setup sccache for Rust compilation caching
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.5
+
+      # Install Rust with caching
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
-          target: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          target: ${{ matrix.target }}
+          cache: false  # We use rust-cache separately for more control
 
+      # Cache Cargo registry, index, and build
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+          cache-on-failure: true
+          shared-key: "${{ matrix.platform }}-${{ matrix.arch }}"
+
+      # Ubuntu dependencies with caching
       - name: Install dependencies (Ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
 
+      # Install frontend dependencies with npm ci (faster than npm install)
       - name: Install frontend dependencies
-        run: npm install
+        run: npm ci
 
+      # Pre-build to populate caches (optional optimization)
+      - name: Pre-build Rust (cache warm-up)
+        working-directory: ./src-tauri
+        run: cargo check --release
+        continue-on-error: true
+
+      # Build Tauri with cache optimization
       - name: Build Tauri
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          RUSTFLAGS: "-C link-arg=-s -C opt-level=z -C lto=fat"
         with:
           projectPath: ./src-tauri
           tagName: ${{ github.ref_name }}
