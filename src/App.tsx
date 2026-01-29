@@ -91,6 +91,7 @@ function AppContent() {
     return () => {
       unlisten.then(f => f());
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadAccounts = async () => {
@@ -108,7 +109,7 @@ function AppContent() {
     try {
       await loadAccounts();
       showToast('Accounts refreshed', 'success');
-    } catch (_error) {
+    } catch {
       showToast('Failed to refresh accounts', 'error');
     } finally {
       setIsRefreshing(false);

@@ -9,16 +9,15 @@ export function SettingsView() {
   const [dataDir, setDataDir] = useState('');
   const { showToast } = useToast();
 
-  const loadDataDir = async () => {
-    try {
-      const dir = await getDataDir();
-      setDataDir(dir);
-    } catch (_err) {
-      console.error('Failed to get data directory:', _err);
-    }
-  };
-
   useEffect(() => {
+    const loadDataDir = async () => {
+      try {
+        const dir = await getDataDir();
+        setDataDir(dir);
+      } catch {
+        // Silently fail - data dir is not critical
+      }
+    };
     loadDataDir();
   }, []);
 
@@ -26,7 +25,7 @@ export function SettingsView() {
     try {
       // Open the data directory in file explorer
       await openUrl(`file://${dataDir}`);
-    } catch (_err) {
+    } catch {
       showToast('Failed to open data directory', 'error');
     }
   };

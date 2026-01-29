@@ -45,7 +45,7 @@ export function AccountCard({ account, onUpdate }: AccountCardProps) {
       await deleteAccount(account.id);
       showToast('Account deleted', 'success');
       onUpdate();
-    } catch (_error) {
+    } catch {
       showToast('Failed to delete account', 'error');
       setIsDeleting(false);
     }
