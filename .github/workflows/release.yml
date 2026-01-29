@@ -10,8 +10,6 @@ env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
   RUST_BACKTRACE: short
-  SCCACHE_GHA_ENABLED: "true"
-  RUSTC_WRAPPER: "sccache"
 
 jobs:
   # Build job with aggressive caching
@@ -50,10 +48,6 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-
-      # Setup sccache for Rust compilation caching
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.5
 
       # Install Rust with caching
       - name: Install Rust
