@@ -118,10 +118,7 @@ async fn get_accounts(state: State<'_, AppState>) -> Result<AccountsResponse, Ap
     for account in accounts {
         // Try to fetch quota for each account
         let quota = if account.access_token.is_some() {
-            match quota::fetch_quota(&account).await {
-                Ok(q) => Some(q),
-                Err(_) => None,
-            }
+            quota::fetch_quota(&account).await.ok()
         } else {
             None
         };

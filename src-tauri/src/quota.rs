@@ -172,7 +172,7 @@ fn normalize_model_name(name: &str) -> String {
         "GPT-OSS 120B".to_string()
     } else {
         // Clean up the name
-        let clean = name.split('/').last().unwrap_or(name);
+        let clean = name.split('/').next_back().unwrap_or(name);
         clean.replace("-", " ").replace("_", " ")
     }
 }

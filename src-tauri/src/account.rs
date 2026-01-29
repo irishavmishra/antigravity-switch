@@ -88,7 +88,7 @@ impl AccountManager {
             picture: None,
             refresh_token,
             access_token: token_data.as_ref().map(|t| t.access_token.clone()),
-            expires_at: token_data.map(|t| chrono::Utc::now().timestamp_millis() + (t.expires_in as i64 * 1000)),
+            expires_at: token_data.map(|t| chrono::Utc::now().timestamp_millis() + (t.expires_in * 1000)),
             is_active: accounts.is_empty(), // First account is active
             added_at: chrono::Utc::now().timestamp_millis(),
             last_switched: None,
@@ -185,7 +185,7 @@ impl AccountManager {
             // Update existing
             existing.refresh_token = tokens.refresh_token;
             existing.access_token = Some(tokens.access_token);
-            existing.expires_at = Some(chrono::Utc::now().timestamp_millis() + (tokens.expires_in as i64 * 1000));
+            existing.expires_at = Some(chrono::Utc::now().timestamp_millis() + (tokens.expires_in * 1000));
             existing.name = user_info.name.or_else(|| Some(user_info.email.split('@').next().unwrap_or("Unknown").to_string()));
             existing.picture = user_info.picture;
             
@@ -202,7 +202,7 @@ impl AccountManager {
             picture: user_info.picture,
             refresh_token: tokens.refresh_token,
             access_token: Some(tokens.access_token),
-            expires_at: Some(chrono::Utc::now().timestamp_millis() + (tokens.expires_in as i64 * 1000)),
+            expires_at: Some(chrono::Utc::now().timestamp_millis() + (tokens.expires_in * 1000)),
             is_active: accounts.is_empty(),
             added_at: chrono::Utc::now().timestamp_millis(),
             last_switched: None,

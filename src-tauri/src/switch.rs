@@ -248,7 +248,7 @@ fn create_oauth_field(access_token: &str, refresh_token: &str, expiry: i64) -> V
     
     // Field 4: expiry timestamp
     let mut timestamp_parts = Vec::new();
-    add_varint(&mut timestamp_parts, ((1 << 3) | 0) as u64); // Field 1, wire type 0
+    add_varint(&mut timestamp_parts, (1 << 3) as u64); // Field 1, wire type 0
     add_varint(&mut timestamp_parts, expiry as u64);
     
     add_varint(&mut parts, ((4 << 3) | 2) as u64); // Field 4, wire type 2 (length-delimited)
